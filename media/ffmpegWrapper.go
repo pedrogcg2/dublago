@@ -5,9 +5,16 @@ import (
 	"log/slog"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strings"
 )
 
 type FfmpegWrapper struct{}
+
+const (
+	ffmpegOutRegex   = `\[out#[0-9].*`
+	ffmpegErrorRegex = "Error.*"
+)
 
 func (w *FfmpegWrapper) Merge(inputVideoPath string, inputAudioPath string, outputVideoPath string) error {
 	slog.Info("[MEDIA] Start merge video and audio files")
@@ -21,15 +28,21 @@ func (w *FfmpegWrapper) Merge(inputVideoPath string, inputAudioPath string, outp
 	err := cmd.Run()
 	if err != nil {
 		slog.Error("[MEDIA] Error on merge files: " + err.Error())
+
+		ffmpegErrorMessage, hasErrorMessage := handleFfmpegLog(stdErr.String(), ffmpegErrorRegex)
+		if hasErrorMessage {
+			slog.Error("[MEDIA] Ffmpeg error message: \n" + ffmpegErrorMessage)
+		}
+
 		return err
 	}
 
-	// TODO:the ffmpeg output log are too long.
-	// retrieve just usable info.
-	// slog.Info(stdErr.String())
+	ffmpegOutMessage, hasMessage := handleFfmpegLog(stdErr.String(), ffmpegOutRegex)
+	if hasMessage {
+		slog.Info("[MEDIA] ffmpeg output message:\n" + ffmpegOutMessage)
+	}
 
 	absOutPath, outPathErr := filepath.Abs(outputVideoPath)
-
 	outValue := absOutPath
 	if outPathErr != nil {
 		outValue = outputVideoPath
@@ -58,14 +71,33 @@ func (w *FfmpegWrapper) Unmerge(inputVideoPath string, outputVideoPath string, o
 	err := cmd.Run()
 	if err != nil {
 		slog.Error("[MEDIA] Error on unmerge files: " + err.Error())
+
+		ffmpegErrorMessage, hasErrorMessage := handleFfmpegLog(stdErr.String(), ffmpegErrorRegex)
+		if hasErrorMessage {
+			slog.Error("[MEDIA] Ffmpeg error message:\n" + ffmpegErrorMessage)
+		}
+
 		return err
 	}
 
-	// TODO:the ffmpeg output logs are too long.
-	// retrieve just usable info.
-	// slog.Info(stdErr.String())
+	ffmpegOutMessage, hasMessage := handleFfmpegLog(stdErr.String(), ffmpegOutRegex)
+	if hasMessage {
+		slog.Info("[MEDIA] ffmpeg output message: \n" + ffmpegOutMessage)
+	}
 
 	slog.Info("[MEDIA] Successfully unmerge audio and video")
 
 	return err
+}
+
+func handleFfmpegLog(log string, exp string) (string, bool) {
+	r, _ := regexp.Compile(exp)
+
+	matches := r.FindAllString(log, -1)
+
+	if len(matches) == 0 {
+		return "", false
+	}
+
+	return strings.Join(matches, "\n"), true
 }
