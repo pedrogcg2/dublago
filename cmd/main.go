@@ -1,9 +1,20 @@
 package main
 
 import (
-	"fmt"
+	"tradutor-dos-crias/media"
+	"tradutor-dos-crias/pipeline"
+	"tradutor-dos-crias/transcript"
+	"tradutor-dos-crias/translator"
+	"tradutor-dos-crias/tts"
 )
 
 func main() {
-	fmt.Println("Tradutor dos crias")
+	transcripter := transcript.NewWhisper()
+	mediaHandler := &media.FfmpegWrapper{}
+	translator := translator.GoogleTranslator{}
+	tts := tts.NewCoquiTTS()
+
+	pipeline := pipeline.NewPipeline(transcripter, mediaHandler, translator, tts)
+
+	pipeline.Run("pipe/video.mp4", "pipe/videoDubbed.mp4")
 }
