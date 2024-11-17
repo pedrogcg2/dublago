@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -62,9 +63,10 @@ func (c *CoquiTTS) Speech(message string) (string, error) {
 		return "", err
 	}
 
+	text := strings.ReplaceAll(message, ".", `\n`)
 	cmd := exec.Command("tts",
 		"--model_name", c.modelName,
-		"--text", message,
+		"--text", text,
 		"--speaker_wav", c.speakerWavPath,
 		"--out_path", outPath,
 		"--language_idx", c.languageIdx)

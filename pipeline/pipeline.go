@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"path/filepath"
+	"tradutor-dos-crias/caption"
 	"tradutor-dos-crias/media"
 	"tradutor-dos-crias/transcript"
 	"tradutor-dos-crias/translator"
@@ -15,18 +16,21 @@ type Pipeline struct {
 	mediaHandler media.MediaHandler
 	translator   translator.Translator
 	speaker      tts.Speecher
+	subtitler    caption.Subtitler
 }
 
 func NewPipeline(transcripter transcript.Transcripter,
 	mediaHandler media.MediaHandler,
 	translator translator.Translator,
 	speaker tts.Speecher,
+	subtitler caption.Subtitler,
 ) *Pipeline {
 	i := &Pipeline{
 		transcripter,
 		mediaHandler,
 		translator,
 		speaker,
+		subtitler,
 	}
 
 	return i
@@ -61,10 +65,23 @@ func (i *Pipeline) Run(inputVideoPath, outputVideoPath string) error {
 		return err
 	}
 
-	err = i.mediaHandler.Merge(tmpVideoName, dubbedAudio, outputVideoPath)
+	tmpDubbedFileName := outputFolderDefault + "/" + uuid.NewString() + ".mp4"
+
+	err = i.mediaHandler.Merge(tmpVideoName, dubbedAudio, tmpDubbedFileName)
 	if err != nil {
 		return err
 	}
 
+	subtitlesPath, err := i.subtitler.GenerateSubtitle(tmpDubbedFileName)
+	if err != nil {
+		return err
+	}
+
+	_, err = i.mediaHandler.MergeSubtitle(tmpDubbedFileName, subtitlesPath, outputVideoPath)
+
+	// filesToRemove := []string{tmpAudioName, tmpVideoName, dubbedAudio, subtitlesPath}
+	// for _, name := range filesToRemove {
+	// 	os.Remove(name)
+	// }
 	return nil
 }
