@@ -58,7 +58,7 @@ func (w *Whisper) Transcript(fPath string) (string, error) {
 	slog.Info("[Transcript] Start transcripting audio")
 
 	outputDir := filepath.Dir(fPath)
-	args := []string{fPath, "--language", w.language, "--model", w.model, "--output_dir", outputDir}
+	args := []string{fPath, "--language", w.language, "--model", w.model, "--output_dir", outputDir, "--output_format", "txt"}
 	cmd := exec.Command("whisper", args...)
 
 	var stdErr bytes.Buffer
