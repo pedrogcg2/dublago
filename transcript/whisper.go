@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -56,7 +57,8 @@ func WithLanguage(language string) Option {
 func (w *Whisper) Transcript(fPath string) (string, error) {
 	slog.Info("[Transcript] Start transcripting audio")
 
-	args := []string{fPath, "--language", w.language, "--model", w.model}
+	outputDir := filepath.Dir(fPath)
+	args := []string{fPath, "--language", w.language, "--model", w.model, "--output_dir", outputDir}
 	cmd := exec.Command("whisper", args...)
 
 	var stdErr bytes.Buffer

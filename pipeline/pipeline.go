@@ -1,7 +1,9 @@
 package pipeline
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"tradutor-dos-crias/caption"
 	"tradutor-dos-crias/media"
 	"tradutor-dos-crias/transcript"
@@ -44,7 +46,8 @@ func (i *Pipeline) Run(inputVideoPath, outputVideoPath string) error {
 
 	tmpVideoName := outputFolderDefault + "/" + uuid.New().String() + ".mp4"
 	tmpAudioName := outputFolderDefault + "/" + uuid.New().String() + ".mp4"
-
+	filesToRemove := &[]string{tmpAudioName, tmpVideoName}
+	defer removeTmpFiles(filesToRemove)
 	err = i.mediaHandler.Unmerge(inputVideoPath, tmpVideoName, tmpAudioName)
 	if err != nil {
 		return err
@@ -53,6 +56,12 @@ func (i *Pipeline) Run(inputVideoPath, outputVideoPath string) error {
 	text, err := i.transcripter.Transcript(tmpAudioName)
 	if err != nil {
 		return err
+	}
+
+	exts := []string{".srt", ".json", ".txt", ".tsv", ".vtt"}
+	for _, ext := range exts {
+		name := strings.ReplaceAll(tmpAudioName, ".mp4", ext)
+		*filesToRemove = append(*filesToRemove, name)
 	}
 
 	translatedText, err := i.translator.Translate(text)
@@ -66,6 +75,7 @@ func (i *Pipeline) Run(inputVideoPath, outputVideoPath string) error {
 	}
 
 	tmpDubbedFileName := outputFolderDefault + "/" + uuid.NewString() + ".mp4"
+	*filesToRemove = append(*filesToRemove, tmpDubbedFileName, dubbedAudio)
 
 	err = i.mediaHandler.Merge(tmpVideoName, dubbedAudio, tmpDubbedFileName)
 	if err != nil {
@@ -76,12 +86,14 @@ func (i *Pipeline) Run(inputVideoPath, outputVideoPath string) error {
 	if err != nil {
 		return err
 	}
-
+	*filesToRemove = append(*filesToRemove, subtitlesPath)
 	_, err = i.mediaHandler.MergeSubtitle(tmpDubbedFileName, subtitlesPath, outputVideoPath)
 
-	// filesToRemove := []string{tmpAudioName, tmpVideoName, dubbedAudio, subtitlesPath}
-	// for _, name := range filesToRemove {
-	// 	os.Remove(name)
-	// }
 	return nil
+}
+
+func removeTmpFiles(filesPath *[]string) {
+	for _, file := range *filesPath {
+		os.Remove(file)
+	}
 }
