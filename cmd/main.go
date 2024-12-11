@@ -1,6 +1,8 @@
 package main
 
 import (
+	"log/slog"
+	"time"
 	"tradutor-dos-crias/caption"
 	"tradutor-dos-crias/media"
 	"tradutor-dos-crias/pipeline"
@@ -10,13 +12,14 @@ import (
 )
 
 func main() {
-	transcripter := transcript.NewWhisper()
 	mediaHandler := &media.FfmpegWrapper{}
-	translator := translator.GoogleTranslator{}
+	transcripter := transcript.NewWhisper()
+	translator := &translator.GoogleTranslator{}
 	tts := tts.NewCoquiTTS()
 	subtitler := caption.NewStablets()
 
 	pipeline := pipeline.NewPipeline(transcripter, mediaHandler, translator, tts, subtitler)
-
-	pipeline.Run("pipe/video.mp4", "pipe/videoDubbed.mp4")
+	start := time.Now()
+	pipeline.Run("pipe/videoDubbed.mp4")
+	slog.Info("[TIME SPEND] " + time.Since(start).String())
 }
