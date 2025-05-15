@@ -46,20 +46,20 @@ func (w *FfmpegWrapper) MergeSubtitle(inputVideoPath, inputSubtitlePath, outputV
 	return outputVideoPath, nil
 }
 
-func (w *FfmpegWrapper) Merge(inputVideoPath, inputAudioPath, outputVideoPath string) error {
+func (w *FfmpegWrapper) Merge(inputVideoPath, inputAudioPath, outputVideoPath string, strategy MergeStrategy) error {
 	slog.Info("[MEDIA] Start merge video and audio files")
 
-	speedUpAudioRatio, err := getAudioSpeedRatio(inputVideoPath, inputAudioPath)
-	if err != nil {
-		slog.Error(err.Error())
-		return err
+	var args []string
+	var err error
+
+	switch strategy {
+	case SpeedUpAudio: 
+		args, err = useSpeedUpStrategy(inputVideoPath, inputAudioPath, outputVideoPath)
+	case CutStream:
+		args, err = useCutStreamStrategy(inputVideoPath, inputAudioPath, outputVideoPath)
 	}
 
-	atempo := fmt.Sprintf("atempo=%f", speedUpAudioRatio)
-
-	args := []string{"-i", inputAudioPath, "-i", inputVideoPath, "-filter:a", atempo, outputVideoPath, "-y"}
 	cmd := exec.Command("ffmpeg", args...)
-
 	var stdErr bytes.Buffer
 	cmd.Stderr = &stdErr
 
@@ -89,6 +89,44 @@ func (w *FfmpegWrapper) Merge(inputVideoPath, inputAudioPath, outputVideoPath st
 
 	return err
 }
+
+func useSpeedUpStrategy(inputVideoPath, inputAudioPath, outputVideoPath string) ([]string, error) {
+	speedUpAudioRatio, err := getAudioSpeedRatio(inputVideoPath, inputAudioPath)
+	if err != nil {
+		slog.Error(err.Error())
+		return nil, err
+	}
+
+	atempo := fmt.Sprintf("atempo=%f", speedUpAudioRatio)
+
+	args := []string{"-i", inputAudioPath, "-i", inputVideoPath, "-filter:a", atempo, outputVideoPath, "-y"}
+	return args, nil
+}
+
+
+func useCutStreamStrategy(inputVideoPath, inputAudioPath, outputVideoPath string) ([]string, error) {
+	aDuration, err := getMediaDuration(inputAudioPath)
+	if err != nil {
+		return nil, err
+	}
+	
+	vDuration, err := getMediaDuration(inputVideoPath)
+	if err != nil {
+		return nil, err
+	}
+	
+	args := make([]string, 0)
+
+	if vDuration > aDuration {
+		args = append(args,"-i", inputAudioPath, "-i", inputVideoPath, "-filter:a", "-shortest", outputVideoPath, "-y")
+	} else {	
+		args = append(args,"-stream_loop","-i", inputAudioPath, "-i", inputVideoPath, "-filter:a", "-shortest", outputVideoPath, "-y")
+	}
+
+	return args, nil
+
+}
+
 
 func (w *FfmpegWrapper) Unmerge(inputVideoPath, outputVideoPath, outputAudioPath string) error {
 	inputValue := inputVideoPath

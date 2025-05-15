@@ -79,7 +79,7 @@ func (i *Pipeline) RunWithYoutube(url, outputVideoPath string) error {
 	tmpDubbedFileName := outputFolderDefault + "/" + uuid.NewString() + ".mp4"
 	filesToRemove = append(filesToRemove, tmpDubbedFileName, dubbedAudio)
 
-	err = i.mediaHandler.Merge(inputVideoPath, dubbedAudio, tmpDubbedFileName)
+	err = i.mediaHandler.Merge(inputVideoPath, dubbedAudio, tmpDubbedFileName, media.SpeedUpAudio)
 	if err != nil {
 		return err
 	}
@@ -97,7 +97,7 @@ func (i *Pipeline) RunWithYoutube(url, outputVideoPath string) error {
 	return nil
 }
 
-func (i *Pipeline) RunWithLocalVideo(videoPath, outputVideoPath string) error {
+func (i *Pipeline) RunWithLocalVideo(videoPath, outputVideoPath string, translate bool) error {
 	filesToRemove := make([]string, 0)
 	filesToRemove = append(filesToRemove, videoPath)
 	defer removeTmpFiles(&filesToRemove)
@@ -122,11 +122,13 @@ func (i *Pipeline) RunWithLocalVideo(videoPath, outputVideoPath string) error {
 		return err
 	}
 
-	translatedText, err := i.translator.Translate(text)
-	if err != nil {
-		return err
+	if translate {
+		translatedText, err := i.translator.Translate(text)
+		if err != nil {
+			return err
+		}
+		text = translatedText
 	}
-
 	unmergedAudioWavPath := outputFolderDefault + "/" + uuid.NewString() + ".mp4"
 	filesToRemove = append(filesToRemove, unmergedAudioPath)
 
@@ -135,27 +137,48 @@ func (i *Pipeline) RunWithLocalVideo(videoPath, outputVideoPath string) error {
 		return err
 	}
 
-	dubbedAudio, err := i.speaker.Speech(translatedText, unmergedAudioWavPath)
+	dubbedAudio, err := i.speaker.Speech(text, unmergedAudioWavPath)
 	if err != nil {
 		return err
 	}
 	filesToRemove = append(filesToRemove, dubbedAudio)
 
-	err = i.mediaHandler.Merge(unmergedVideoPath, dubbedAudio, outputVideoPath)
+	err = i.mediaHandler.Merge(unmergedVideoPath, dubbedAudio, outputVideoPath,
+		media.SpeedUpAudio)
 	if err != nil {
 		return err
 	}
 
-	// subtitlesPath, err := i.subtitler.GenerateSubtitle(outputVideoPath)
-	// if err != nil {
-	// 	return err
-	// }
-	// filesToRemove = append(filesToRemove, subtitlesPath)
-	// _, err = i.mediaHandler.MergeSubtitle(outputVideoPath, subtitlesPath, outputVideoPath)
-	// if err != nil {
-	// 	return err
-	// }
+	subtitlesPath, err := i.subtitler.GenerateSubtitle(outputVideoPath)
+	if err != nil {
+		return err
+	}
+	filesToRemove = append(filesToRemove, subtitlesPath)
+	_, err = i.mediaHandler.MergeSubtitle(outputVideoPath, subtitlesPath, outputVideoPath)
+	if err != nil {
+		return err
+	}
 
+	return nil
+}
+
+func (i *Pipeline) RunFromText(textInput, videoInputPath, outputVideoPath string) error {
+	filesToRemove := make([]string, 0)
+	defer removeTmpFiles(&filesToRemove)
+
+	audio, err := i.speaker.Speech(textInput, "")
+	if err != nil {
+		return err
+	}
+	filesToRemove = append(filesToRemove, audio)
+
+	err = i.mediaHandler.Merge(videoInputPath, audio, outputVideoPath, media.CutStream)
+	subtitlesPath, err := i.subtitler.GenerateSubtitle(outputVideoPath)
+	if err != nil {
+		return err
+	}
+
+	filesToRemove = append(filesToRemove, subtitlesPath)
 	return nil
 }
 
